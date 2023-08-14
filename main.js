@@ -10,27 +10,53 @@ import { format } from "https://deno.land/std@0.198.0/fmt/duration.ts"
 const defaultAuthTokenLocation = `${FileSystem.home}/.ssh/default_telegram_bot_token`
 const envVarName = `DENO_TELEGRAM_BOT_TOKEN`
 
-const cliOptions = ["token", "processPid", "chatName", "chatId", "checkInterval", "processName"]
-const flags = parse(Deno.args, {
-    boolean: ["help"],
-    string: cliOptions, 
-    default: {
-        checkInterval: 5000, // miliseconds
-    },
-})
-
-if (flags.help) {
-    console.log(`
-NOTE: no arguments are required
-      everything will be asked interactively
-      (if not given as a argument)
-
-process_end_notifier ${cliOptions.map(each=>`\n      --${each} <string>`).join("")}
-    `)
-    Deno.exit()
+// 
+// these are the only OS-specific functions
+// 
+const listProcessesWithName = async (name)=>(await run`ps -axww -o pid,command ${Stdout(returnAsString)}`).split("\n").filter(each=>each.match(name)).map(each=>`    ${each.split(/[ \t]+/).map((each,index)=>index==0?green(each):each).join(" ")}`).join("")
+const processIsStillRunning = async (pid)=>(await run`ps -p ${pid} ${Stdout(returnAsString)}`).match(pid)
+const maybeProcessDuration = async (pid)=>{
+    const status = (await run`ps -p ${pid} ${Stdout(returnAsString)}`)
+    try {
+        const rows = status.split("\n").filter(each=>each.length!=0).map(each=>each.trim().split(/[\s\t \n]+/g))
+        if (rows.length > 1) {
+            const index = rows[0].indexOf("TIME")
+            lastObservedTime = rows[1][index]
+        }
+        return lastObservedTime
+    } catch (error) {
+        console.error(error)
+    }
 }
 
 
+// 
+// basic CLI 
+// 
+    const cliOptions = ["token", "processPid", "chatName", "chatId", "checkInterval", "processName"]
+    const flags = parse(Deno.args, {
+        boolean: ["help", "dontCacheToken"],
+        string: cliOptions, 
+        default: {
+            checkInterval: 5000, // miliseconds
+        },
+    })
+
+    if (flags.help) {
+        console.log(`
+    NOTE: no arguments are required
+        everything will be asked interactively
+        (if not given as a argument)
+
+    ${FileSystem.basename(FileSystem.thisFile)} ${cliOptions.map(each=>`\n      --${each} <string>`).join("")}
+        `)
+        Deno.exit()
+    }
+
+
+// 
+// AUTH token
+// 
 const defaultBotTokenPath = `${FileSystem.home}/.ssh/default_telegram_bot_token`
 let token = flags.token || Deno.env.get(envVarName) || await FileSystem.read(defaultBotTokenPath)
 if (!token) {
@@ -39,18 +65,24 @@ if (!token) {
     console.log(`
         If you don't have an auth token:
         - go to https://t.me/botfather
-        - send "/newbot"
+        - send a "/newbot" message 
         - copy the token out of the response message
     `)
     token = prompt("What's your AUTH token?")
-    FileSystem.write({
-        path: defaultBotTokenPath,
-        data: token,
-    })
+    if (!flags.dontCacheToken) {
+        FileSystem.write({
+            path: defaultBotTokenPath,
+            data: token,
+        }).then(()=>{
+            FileSystem.setPermissions()
+        })
+    }
 }
 
+// 
+// chat id
+// 
 const bot = new Bot(token)
-
 let chatId = flags.chatId-0
 if (!chatId) {
     const updates = (await fetch(`https://api.telegram.org/bot${token}/getUpdates`).then(result=>result.json()))?.result || []
@@ -103,23 +135,29 @@ if (!chatId) {
     }
 }
 
-if (!args.processPid) {
+
+// 
+// process id
+// 
+if (!flags.processPid) {
     const name = Console.askFor.line("Whats part of the name of the process? (or the whole name)")
     console.log("Here's the process information I have for that:")
     console.log(
-        (await run`ps -axww -o pid,command ${Stdout(returnAsString)}`).split("\n").filter(each=>each.match(name)).map(each=>`    ${each.split(/[ \t]+/).map((each,index)=>index==0?green(each):each).join(" ")}`).join("")
+        await listProcessesWithName(name)
     )
-    args.processPid = Console.askFor.line("What's the PID of the process you're looking for?")-0
+    flags.processPid = Console.askFor.line("What's the PID of the process you're looking for?")-0
 }
 
 
+// 
+// actual watcher
+// 
 let lastObservedTime = 0
 console.log(`Okay I am now watching: ${flags.processPid}`)
 const startTime = (new Date()).getTime()
 setInterval(async ()=>{
     try {
-        const status = await run`ps -p ${flags.processPid} ${Stdout(returnAsString)}`
-        if (!status.match(flags.processPid)) {
+        if (!await processIsStillRunning(flags.processPid)) {
             const endTime = (new Date()).getTime()
             const duration = endTime - startTime
             const humanReadableDuration = format(duration, { style: "full", ignoreZero: true })
@@ -129,15 +167,7 @@ setInterval(async ()=>{
             })
             Deno.exit()
         } else {
-            try {
-                const rows = status.split("\n").filter(each=>each.length!=0).map(each=>each.trim().split(/[\s\t \n]+/g))
-                if (rows.length > 1) {
-                    const index = rows[0].indexOf("TIME")
-                    lastObservedTime = rows[1][index]
-                }
-            } catch (error) {
-                console.error(error)
-            }
+            lastObservedTime = await maybeProcessDuration(pid)
         }
     } catch (error) {
         console.error(error)
