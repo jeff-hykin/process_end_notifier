@@ -13,7 +13,7 @@ const envVarName = `DENO_TELEGRAM_BOT_TOKEN`
 // 
 // these are the only OS-specific functions
 // 
-const listProcessesWithName = async (name)=>(await run`ps -axww -o pid,command ${Stdout(returnAsString)}`).split("\n").filter(each=>each.match(name)).map(each=>`    ${each.split(/[ \t]+/).map((each,index)=>index==0?green(each):each).join(" ")}`).join("")
+const listProcessesWithName = async (name)=>(await run`ps -axww -o pid,command ${Stdout(returnAsString)}`).split("\n").filter(each=>each.match(name)).map(each=>`    ${each.split(/[ \t]+/).map((each,index)=>index==0?green(each):each).join(" ")}`).join("\n")
 const processIsStillRunning = async (pid)=>(await run`ps -p ${pid} ${Stdout(returnAsString)}`).match(pid)
 const maybeProcessDuration = async (pid)=>{
     const status = (await run`ps -p ${pid} ${Stdout(returnAsString)}`)
@@ -145,7 +145,7 @@ if (!chatId) {
         }
     } else {
         while (!chatId) {
-            chatName = prompt(`Which chat would you like it to message?\nAvailable chats: ${Object.keys(chatNameToId).join(", ")}`)
+            chatName = prompt(`Which chat would you like it to message?\nAvailable chats: ${Object.keys(chatNameToId).join(", ")}\n:`)
             chatId = (chatNameToId[chatName] || chatNameToId[chatName.trim()])-0
             if (!chatId) {
                 console.log(`Sorry I didn't see that one. Try copying and pasting the name from the Available chats: ${JSON.stringify(Object.keys(chatNameToId))}`)
