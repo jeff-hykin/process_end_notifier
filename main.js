@@ -14,9 +14,9 @@ const envVarName = `DENO_TELEGRAM_BOT_TOKEN`
 // these are the only OS-specific functions
 // 
 const listProcessesWithName = async (name)=>(await run`ps -axww -o pid,command ${Stdout(returnAsString)}`).split("\n").filter(eachLine=>eachLine.match(name)).map(eachLine=>`    ${eachLine.split(/(?<!^)[ \t\s\n\r]+/).map((each,index)=>index==0?green(each):each).join(" ")}`).join("\n")
-const processIsStillRunning = async (pid)=>(await run`ps -p ${pid} ${Stdout(returnAsString)}`).match(pid)
+const processIsStillRunning = async (pid)=>(await run`ps ${`-p${pid}`} ${Stdout(returnAsString)}`).match(pid)
 const maybeProcessDuration = async (pid)=>{
-    const status = (await run`ps -p ${pid} ${Stdout(returnAsString)}`)
+    const status = (await run`ps ${`-p${pid}`} ${Stdout(returnAsString)}`)
     try {
         const rows = status.split("\n").filter(each=>each.length!=0).map(each=>each.trim().split(/[\s\t \n]+/g))
         if (rows.length > 1) {
