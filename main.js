@@ -49,7 +49,7 @@ const maybeProcessDuration = async (pid)=>{
         everything will be asked interactively
         (if not given as a argument)
 
-    ${FileSystem.basename(FileSystem.thisFile)} ${stringOptions.map(each=>`\n      --${each} <string>`).join("")}${booleanOptions.map(each=>`\n      ${each}`).join("")}
+    process_end_notifier ${stringOptions.map(each=>`\n      --${each} <string>`).join("")}${booleanOptions.map(each=>`\n      ${each}`).join("")}
         `)
         Deno.exit()
     }
@@ -187,7 +187,7 @@ setInterval(async ()=>{
             })
             Deno.exit()
         } else {
-            lastObservedTime = await maybeProcessDuration(pid)
+            lastObservedTime = await maybeProcessDuration(flags.processPid)
         }
     } catch (error) {
         console.error(error)
