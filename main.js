@@ -33,10 +33,11 @@ const maybeProcessDuration = async (pid)=>{
 // 
 // basic CLI 
 // 
-    const cliOptions = ["token", "processPid", "chatName", "chatId", "checkInterval", "processName"]
+    const stringOptions = ["token", "processPid", "chatName", "chatId", "checkInterval", "processName",]
+    const booleanOptions = ["dontCacheToken"]
     const flags = parse(Deno.args, {
-        boolean: ["help", "dontCacheToken"],
-        string: cliOptions, 
+        boolean: ["help", ...booleanOptions],
+        string: stringOptions, 
         default: {
             checkInterval: 5000, // miliseconds
         },
@@ -48,7 +49,7 @@ const maybeProcessDuration = async (pid)=>{
         everything will be asked interactively
         (if not given as a argument)
 
-    ${FileSystem.basename(FileSystem.thisFile)} ${cliOptions.map(each=>`\n      --${each} <string>`).join("")}
+    ${FileSystem.basename(FileSystem.thisFile)} ${stringOptions.map(each=>`\n      --${each} <string>`).join("")}${booleanOptions.map(each=>`\n      ${each}`).join("")}
         `)
         Deno.exit()
     }
@@ -74,7 +75,26 @@ if (!token) {
             path: defaultBotTokenPath,
             data: token,
         }).then(()=>{
-            FileSystem.setPermissions()
+            FileSystem.addPermissions({
+                path: defaultBotTokenPath,
+                permissions: {
+                    owner: {
+                        canExecute: 0,
+                        canWrite: true,
+                        canRead: true,
+                    },
+                    group: {
+                        canExecute: 0,
+                        canWrite: 0,
+                        canRead: 0,
+                    },
+                    other: {
+                        canExecute: 0,
+                        canWrite: 0,
+                        canRead: 0,
+                    },
+                }
+            })
         })
     }
 }
